@@ -109,7 +109,7 @@ for i in range(MAIN_MEMORY_SIZE // WORD_SIZE):
     main_memory_text.insert(tk.END, address_binary+'\n')
 
 #_____________________________BITS_GUI__________________________________________
-# Create text box to display the physical address, tag bits, line bits, and byte offset
+# Create text box to display the physical address
 address_label = tk.Label(window, text="Physical Address: ", fg="#FFFFFF", bg="#333333")
 address_label.grid(row=1, column=0, padx=55, pady=3, sticky="w")
 
@@ -118,6 +118,7 @@ physical_address_var.set("")
 address_display_label = tk.Label(cpu_frame, textvariable=physical_address_var, fg="#FFFFFF", bg="#333333")
 address_display_label.grid(row=1, column=0, padx=45, pady=10, sticky="w")
 
+# Create text box to display tag bits
 tag_bits_label = tk.Label(window, text="Tag Bits: ", fg="#FFFFFF", bg="#333333")
 tag_bits_label.grid(row=3, column=0, padx=10, pady=5, sticky="w")
 
@@ -126,6 +127,7 @@ tag_bits_var.set("")
 tag_bits_display_label = tk.Label(window, textvariable=tag_bits_var, fg="#FFFFFF", bg="#333333")
 tag_bits_display_label.grid(row=3, column=1, padx=10, pady=5, sticky="w")
 
+# Create text box to display line bits
 line_number_label = tk.Label(window, text="Line Bits: ", fg="#FFFFFF", bg="#333333")
 line_number_label.grid(row=4, column=0, padx=10, pady=5, sticky="w")
 
@@ -134,6 +136,7 @@ line_number_var.set("")
 line_number_display_label = tk.Label(window, textvariable=line_number_var, fg="#FFFFFF", bg="#333333")
 line_number_display_label.grid(row=4, column=1, padx=10, pady=5, sticky="w")
 
+# Create text box to display byte offset
 bit_offset_label = tk.Label(window, text="Byte Offest: ", fg="#FFFFFF", bg="#333333")
 bit_offset_label.grid(row=5, column=0, padx=10, pady=5, sticky="w")
 
@@ -146,18 +149,19 @@ bit_offset_display_label.grid(row=5, column=1, padx=10, pady=5, sticky="w")
 cache_result_text = tk.Text(window, height=6, width=50)
 cache_result_text.grid(row=6, column=0, columnspan=5, padx=10, pady=(0, 10))
 
+#_____________________________CACHE_MAPPING_LOGIC__________________________________________
 # Function to fetch a random integer between min and max (inclusive)
 def get_random_int(min_value, max_value):
     return random.randint(min_value, max_value)
 
-
+# Function to fetch address from L1 cache
 def fetch_from_L1_cache(address):
-    # Calculate cache index, tag bits, and byte offset for L1 cache
+    # Calculate cache index, tag bits, and byte offset
     line_bits = (address % (L1_CACHE_LINES * L1_LINE_SIZE)) // L1_LINE_SIZE
     tag = address // (L1_CACHE_LINES * L1_LINE_SIZE)
     byte_offset = address % L1_LINE_SIZE
 
-    # Update labels with address details
+    # Display labels with address details
     physical_address_var.set(f"{address:016b}")
     tag_bits_var.set(f"{tag:03b}")
     line_number_var.set(f"{line_bits:07b}")
@@ -165,12 +169,12 @@ def fetch_from_L1_cache(address):
 
     # Check if cache index is within the valid range
     if 0 <= line_bits < L1_CACHE_LINES:
-        # Check L1 cache
+        # Check L1 cache 
         if l1_cache[line_bits] is not None and l1_cache[line_bits] == tag:
             # Cache hit in L1
             cache_result_text.insert(tk.END, "L1 Cache Hit!\n", "hit")
             # Update LRU access time for the line (move to the head of the linked list)
-            update_lru_in_l1_cache(line_bits)
+            update_lru_in_vic_cache(line_bits)
             return l1_cache[line_bits]
         else:
             # L1 cache miss
@@ -181,11 +185,9 @@ def fetch_from_L1_cache(address):
         cache_result_text.insert(tk.END, "Invalid L1 Cache Index!\n", "miss")
         return None
 
-
-
-def update_lru_in_l1_cache(cache_line_index):
-    # If there's no LRU linked list implemented, create one here
-    # This example uses a simple Python list to represent the LRU order
+# Function to update the LRU order of the victim cache
+def update_lru_in_vic_cache(cache_line_index):
+    # using a list to represent the LRU order
     if not l1_victim_cache:
         l1_victim_cache.append(cache_line_index)
     else:
@@ -194,18 +196,20 @@ def update_lru_in_l1_cache(cache_line_index):
             l1_victim_cache.remove(cache_line_index)
         l1_victim_cache.insert(0, cache_line_index)
 
+# Function to fetch address from victim cache
 def fetch_from_victim_cache(address):
     victim_tag_bits = address % L1_VICTIM_CACHE_LINES
 
     if l1_victim_cache:
         for i in range(len(l1_victim_cache)):
+            # Matching tag bits with the victim cache
             if l1_victim_cache[i] == victim_tag_bits:
                 # Victim cache hit
                 cache_result_text.insert(tk.END, "Victim Cache Hit!\n", "hit")
                 data = l1_victim_cache[i]
                 update_victim_cache_display(i, data)
                 return data
-
+        # Victim cache miss
         cache_result_text.insert(tk.END, "Victim Cache Miss!\n", "miss")
         victim_line_to_evict = replace_line_in_victim_cache(address)
         if victim_line_to_evict is not None:
@@ -222,6 +226,7 @@ def fetch_from_victim_cache(address):
         cache_result_text.insert(tk.END, "Victim Cache Empty!\n", "miss")
         return fetch_from_L2_cache(address)
 
+# Function to fetch address from the L2 cache
 def fetch_from_L2_cache(address):
     # Calculate set index, tag, and offset
     set_index = (address // WORD_SIZE) % (L2_CACHE_LINES // 4)
@@ -248,7 +253,7 @@ def fetch_from_L2_cache(address):
             # Ensure we don't enter an infinite loop
             return data
 
-
+# Function to return LRU line in victim cache
 def replace_line_in_victim_cache(address):
     # Implement LRU eviction policy for the victim cache
     if not l1_victim_cache:
@@ -257,16 +262,14 @@ def replace_line_in_victim_cache(address):
     # Least Recently Used line is at the end of the LRU list
     return len(l1_victim_cache) - 1
 
+# Function to implement LRU eviction policy for L2 cache
 def replace_line_in_L2_cache(set_index):
-    # Implement eviction policy for L2 cache (e.g., LRU, FIFO)
-    # Here, we use LRU
 
     # Identify the starting and ending line indices within the set
     start_line_index = set_index * 4
     end_line_index = start_line_index + 3
 
     # Maintain a separate LRU list for each set in L2
-    # (This can be optimized using a single LRU list with additional logic)
     lru_list = [i for i in range(start_line_index, end_line_index + 1)]
 
     # Least Recently Used line is at the end of the LRU list for the set
@@ -274,16 +277,18 @@ def replace_line_in_L2_cache(set_index):
     lru_list.remove(victim_line_to_evict)
     return victim_line_to_evict  # Return the line index to be evicted
 
+# Function to fetch address from main memory
 def fetch_from_main_memory(address):
     word_index = address // WORD_SIZE
     cache_result_text.insert(tk.END, "Found in Main Memory! Moving to Cache\n", "hit")
     data = random.randint(0, 9)
     return data
 
+# Function to simulate memory access 
 def access_memory():
     cache_result_text.delete(1.0, tk.END)
-    address = get_random_int(0, MAIN_MEMORY_SIZE - 1)
-    data = fetch_from_L1_cache(address)
+    address = get_random_int(0, MAIN_MEMORY_SIZE - 1)   # Get a random address from dummy processor
+    data = fetch_from_L1_cache(address) # Fetch address from L1 cache
 
 # Create Access Memory button
 access_memory_button = tk.Button(window, text="Access Memory", command=access_memory, bg="light green", fg="#333333",
